@@ -1,71 +1,77 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"net/rpc"
-	"fmt"
+	"time"
+
+	"github.com/gorilla/mux"
+
+	pb "rpc/rpc/protos/sum"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-type httpHandler struct {
-	rpcClient *rpc.Client
+type RequestPayload struct {
+	A int `json:"a"`
+	B int `json:"b"`
 }
 
-type Args struct{}
+type ResponsePayload struct {
+	Result int `json:"result"`
+}
 
-func (h *httpHandler) GetTime(w http.ResponseWriter, r *http.Request) {
-	// Prepare arguments and response
-	var reply int64
-	args := Args{}
+// gRPC client used to call the gRPC server.
+//var grpcClient pb.SumServiceClient
 
-	// Call the remote procedure
-	err := h.rpcClient.Call("TimeServer.GiveServerTime", args, &reply)
-	if err != nil {
-		http.Error(w, "Error calling remote procedure: "+err.Error(), http.StatusInternalServerError)
-		log.Println("Error in TimeServer.GiveServerTime: ", err)
+func addHandler(w http.ResponseWriter, r *http.Request) {
+
+	var reqPayload RequestPayload
+
+	// Parse the JSON request body
+	if err := json.NewDecoder(r.Body).Decode(&reqPayload); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
-
-	// Write the response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"server_time": ` + fmt.Sprintf("%d", reply) + `}`))
-	log.Printf("Server time received: %d", reply)
-}
-
-func initRPCClient() (*rpc.Client, error) {
-	// Create a new RPC client
-	client, err := rpc.DialHTTP("tcp", "0.0.0.0:1234")
+	// Make the Add RPC call
+	conn, err := grpc.NewClient("localhost:1234", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, err
+		log.Fatalf("Failed to connect: %v", err)
 	}
-	return client, nil
-}
+	defer conn.Close()
 
-func initRoutes(rpcClient *rpc.Client) *http.ServeMux {
-	router := http.NewServeMux()
-	h := &httpHandler{rpcClient: rpcClient}
-	router.HandleFunc("/time", h.GetTime) // Pass the function, not the result of calling it
-	return router
+	grpcClient := pb.NewSumServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	req := &pb.SumRequest{A: int32(reqPayload.A), B: int32(reqPayload.B)}
+	res, err := grpcClient.Add(ctx, req)
+	if err != nil {
+		log.Fatalf("Error calling Add: %v", err)
+	}
+
+	fmt.Printf("Result of %d + %d = %d\n", req.A, req.B, res.Result)
+
+	// Create and send the response
+	ResponsePayload := ResponsePayload{Result: int(res.Result)}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ResponsePayload)
+
 }
 
 func main() {
-	// Initialize RPC client
-	rpcClient, err := initRPCClient()
-	if err != nil {
-		log.Fatal("Failed to connect to RPC server: ", err)
-	}
-	defer rpcClient.Close()
 
-	// Create a new HTTP server
-	server := &http.Server{
-		Addr:    ":8080",
-		Handler: initRoutes(rpcClient),
-	}
+	// Set up a connection to the server.
+	r := mux.NewRouter()
 
-	// Log and start the server
-	log.Println("Starting server on port 8080")
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatal("Server failed: ", err)
-	}
+	r.HandleFunc("/add", addHandler).Methods("POST")
+
+	fmt.Println("Starting server on port :8080")
+	http.ListenAndServe(":8080", r)
+
 }
