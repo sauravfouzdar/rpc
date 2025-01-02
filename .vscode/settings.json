@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./sum_pb2_"
+    ]
+}
