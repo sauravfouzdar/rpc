@@ -7,7 +7,7 @@ import sum_pb2_grpc
 def run():
     channel = grpc.insecure_channel('localhost:1234')
     stub = sum_pb2_grpc.SumServiceStub(channel)
-    response = stub.Add(sum_pb2.SumRequest(a=1, b=2))
+    response = stub.Add(sum_pb2.SumRequest(a=7, b=19))
     print(response.result)
 
 
