@@ -26,8 +26,7 @@ type ResponsePayload struct {
 }
 
 // gRPC client used to call the gRPC server.
-//var grpcClient pb.SumServiceClient
-
+// var grpcClient pb.SumServiceClient
 func addHandler(w http.ResponseWriter, r *http.Request) {
 
 	var reqPayload RequestPayload
@@ -72,6 +71,10 @@ func main() {
 	r.HandleFunc("/add", addHandler).Methods("POST")
 
 	fmt.Println("Starting server on port :8080")
-	http.ListenAndServe(":8080", r)
+	err := http.ListenAndServe(":8080", r)
+
+	if err != nil {
+		log.Fatalf("Failed to serve: %v", err)
+	}
 
 }
