@@ -1,5 +1,5 @@
 ## RPC 
-` A simple grpc server with a simple client that sends a request to the server and the server responds with a message.`
+A simple grpc server with a client that sends a request to the server and the server responds with a message(result).
 
 
 ## Generate the proto file
@@ -17,7 +17,10 @@ protoc --go_out=. --go-grpc_out=. calculator.proto
 ```
 
 ## How to run
-1. Clone the repository
-2. Run the server - `go run rpc/rpc_server.go`
-3. Run the client - `go run rpc/client.go`
+1. Install go
+2. Install the dependencies - `go mod tidy`
+3. Install python and the grpcio-tools package
+4. Generate the proto file
+5. Run the server - `go run rpc/rpc_server.go`
+6. Run the client - `go run rpc/client.go`
 
